@@ -1,0 +1,11 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# OS
+

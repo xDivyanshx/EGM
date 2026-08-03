@@ -1,0 +1,38 @@
+[
+  {
+    "TimestampUtc": "2026-02-12T19:16:01.4054637Z",
+    "PreviousVersion": "1.0.0",
+    "InstalledVersion": "1.1.4",
+    "RolledBack": false
+  },
+  {
+    "TimestampUtc": "2026-02-13T08:36:49.9978862Z",
+    "PreviousVersion": "1.1.4",
+    "InstalledVersion": "1.1.5",
+    "RolledBack": false
+  },
+  {
+    "TimestampUtc": "2026-02-13T09:38:19.0115637Z",
+    "PreviousVersion": "1.1.5",
+    "InstalledVersion": "1.1.6",
+    "RolledBack": false
+  },
+  {
+    "TimestampUtc": "2026-02-13T12:39:54.9925482Z",
+    "PreviousVersion": "1.1.6",
+    "InstalledVersion": "1.1.7",
+    "RolledBack": false
+  },
+  {
+    "TimestampUtc": "2026-02-13T12:50:14.6214596Z",
+    "PreviousVersion": "1.1.7",
+    "InstalledVersion": "1.1.7",
+    "RolledBack": true
+  },
+  {
+    "TimestampUtc": "2026-02-13T13:07:44.2707225Z",
+    "PreviousVersion": "1.1.7",
+    "InstalledVersion": "1.1.8",
+    "RolledBack": false
+  }
+]
