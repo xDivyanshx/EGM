@@ -124,7 +124,10 @@ namespace EGM.Core.Services
 
             if (parts.Length >= 3 && parts[1].Equals("--package", StringComparison.OrdinalIgnoreCase))
             {
-                var packagePath = parts[2].Trim('"');
+                // Join everything after "--package" so paths containing spaces
+                // (e.g. C:\Program Files\pkg.txt) survive the Split(' ') above.
+                // parts[2] alone would keep only the first token before the space.
+                var packagePath = string.Join(" ", parts.Skip(2)).Trim('"');
                 _updateManager.InstallPackage(packagePath);
             }
             else

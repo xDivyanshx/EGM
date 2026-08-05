@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Only .NET 10 runtime is installed in this environment; allow running the net8 build on it. -->
+    <RollForward>Major</RollForward>
+    <RootNamespace>EGM.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reuse ALL existing business logic unchanged. This is the whole point of the
+         interface-driven design: the web layer is just a new presentation shell. -->
+    <ProjectReference Include="..\EGM.Core.csproj" />
+  </ItemGroup>
+
+</Project>

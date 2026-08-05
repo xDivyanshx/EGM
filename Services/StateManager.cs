@@ -25,6 +25,8 @@ namespace EGM.Core.Services
 
         public bool TransitionTo(EGMStateEnum newState, string reason)
         {
+            bool changed;
+
             lock (_lock)
             {
                 // Check if we are already in the requested state
@@ -41,10 +43,19 @@ namespace EGM.Core.Services
                     return false;
                 }
 
-                //  Execute Transition
+                //  Execute Transition (mutates state + logs, but does NOT fire the event)
                 PerformTransition(newState, reason);
-                return true;
+                changed = true;
             }
+
+            // Fire OnStateChanged OUTSIDE the lock: subscribers may read CurrentState,
+            // request another transition, or take their own locks. Invoking while holding
+            // _lock risks reentrancy (a subscriber mutating state mid-transition) and
+            // cross-thread deadlock (lock-ordering inversion with a subscriber's lock).
+            if (changed)
+                NotifyStateChanged(newState);
+
+            return true;
         }
 
         public void ForceState(EGMStateEnum newState, string reason)
@@ -54,15 +65,23 @@ namespace EGM.Core.Services
                 _logger.Log(LogTypeEnum.Warning, $"[FORCE] Forcing state to {newState}. Reason: {reason}");
                 PerformTransition(newState, reason);
             }
+
+            // Same reasoning as TransitionTo: notify after releasing the lock.
+            NotifyStateChanged(newState);
         }
 
+        // Mutates state and logs the change. MUST be called while holding _lock.
+        // Deliberately does not raise OnStateChanged - callers fire it after unlocking.
         private void PerformTransition(EGMStateEnum newState, string reason)
         {
             var oldState = _currentState;
             _currentState = newState;
 
             _logger.Log(LogTypeEnum.Info, $"State Changed: {oldState} -> {newState} | Reason: {reason}");
+        }
 
+        private void NotifyStateChanged(EGMStateEnum newState)
+        {
             OnStateChanged?.Invoke(newState);
         }
         private static bool IsValidTransition(EGMStateEnum current, EGMStateEnum next)

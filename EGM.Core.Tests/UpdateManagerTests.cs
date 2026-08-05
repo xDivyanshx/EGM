@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 using Moq;
 using EGM.Core.Services;
 using EGM.Core.Interfaces;
@@ -63,6 +63,52 @@ namespace EGM.Core.Tests
             _mockHistory.Verify(h => h.RecordRollback(currentVer), Times.Once);
             _mockConfig.Verify(c => c.UpdateConfig(It.IsAny<Action<SystemConfig>>()), Times.Once);
             _mockState.Verify(s => s.TransitionTo(EGMStateEnum.IDLE, "Rollback completed"), Times.Once);
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData(null)]
+        public void InstallPackage_EmptyPath_ShouldNoOp(string? path)
+        {
+            _updateManager.InstallPackage(path!);
+
+            // Never even attempts to enter UPDATING.
+            _mockState.Verify(s => s.TransitionTo(It.IsAny<EGMStateEnum>(), It.IsAny<string>()), Times.Never);
+            _mockConfig.Verify(c => c.UpdateConfig(It.IsAny<Action<SystemConfig>>()), Times.Never);
+        }
+
+        [Fact]
+        public void InstallPackage_NotIdle_ShouldAbortBeforeValidation()
+        {
+            // System refuses to enter UPDATING (e.g. it is RUNNING or in MAINTENANCE).
+            _mockState.Setup(s => s.TransitionTo(EGMStateEnum.UPDATING, It.IsAny<string>())).Returns(false);
+
+            _updateManager.InstallPackage("update_pkg_2.0.0.txt");
+
+            var dummy = new Version(0, 0);
+            string dummyErr;
+            _mockValidator.Verify(v => v.TryValidateAndExtractVersion(
+                It.IsAny<string>(), It.IsAny<Version>(), out dummy, out dummyErr), Times.Never);
+            _mockConfig.Verify(c => c.UpdateConfig(It.IsAny<Action<SystemConfig>>()), Times.Never);
+        }
+
+        [Fact]
+        public void InstallPackage_ValidationFails_ShouldReturnToIdle_NoConfigChange()
+        {
+            var currentVer = new Version(1, 0, 0);
+            _mockConfig.Setup(c => c.GetConfig()).Returns(new SystemConfig { CurrentVersion = currentVer });
+            _mockState.Setup(s => s.TransitionTo(EGMStateEnum.UPDATING, It.IsAny<string>())).Returns(true);
+
+            var outVer = new Version(0, 0);
+            string err = "Downgrade or same version not allowed.";
+            _mockValidator.Setup(v => v.TryValidateAndExtractVersion(It.IsAny<string>(), currentVer, out outVer, out err)).Returns(false);
+
+            _updateManager.InstallPackage("update_pkg_0.5.0.txt");
+
+            _mockState.Verify(s => s.TransitionTo(EGMStateEnum.IDLE, "Update validation failed"), Times.Once);
+            _mockConfig.Verify(c => c.UpdateConfig(It.IsAny<Action<SystemConfig>>()), Times.Never);
+            _mockHistory.Verify(h => h.RecordInstall(It.IsAny<Version>(), It.IsAny<Version>()), Times.Never);
         }
     }
 }
