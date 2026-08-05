@@ -3,6 +3,8 @@
 **Last updated:** 2026-08-06  
 **Status:** Functionally complete, 40 passing tests, 0 warnings, 29.2% line coverage
 
+**Documentation**: Three docs at repo root — `README.md` (user-focused, CLI + web dashboard, 5-step demo with screenshots), `ARCHITECTURE.md` (developer-focused, design patterns, Mermaid state/sequence diagrams, threading model, testing rationale), and this file (AI session context).
+
 ## Overview
 
 **Electronic Gaming Machine (EGM)** - a casino slot machine core control module simulation demonstrating safety-critical software patterns. Built as a learning project to understand regulated gaming systems, state machines, transactional updates, and defensive programming.
