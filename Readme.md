@@ -1,22 +1,33 @@
-# EGM Core Module Template
+# EGM Core Module
 
-This project is a logic-only C# console application that simulates the core control module of an Electronic Gaming Machine (EGM). It demonstrates robust state management, hardware simulation, transactional updates with rollback, and audit logging.
+This project simulates the core control module of an Electronic Gaming Machine (EGM) — the software inside a casino slot machine. It demonstrates robust state management, hardware simulation, transactional updates with rollback, and audit logging.
+
+It ships with **two front-ends over one shared core**:
+- **CLI** — the original interactive console (`EGM.Core`)
+- **Web dashboard** — a React UI over a REST API (`EGM.Api`)
+
+Both reuse the identical business logic, demonstrating interface-driven, swappable architecture.
+
+> For design patterns, state diagrams, and threading details, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## Prerequisites
 
 * **OS**: Windows, Linux, or macOS.
-* **.NET SDK**: Version 6.0 or later (Developed with .NET 8.0).
+* **.NET SDK**: Version 8.0 or later. (On machines with only newer SDKs installed, set `DOTNET_ROLL_FORWARD=Major`.)
 * **IDE (Optional)**: Visual Studio 2022 or VS Code.
 
 ## Project Structure
 
-* `EGM.Core/`: Main application source code.
-* `EGM.Core.Tests/`: Unit tests using xUnit and Moq.
-* `Logs/`: Automatically generated folder storing logs, configuration, and install history.
+* `EGM.Core/`: Main console application source code.
+* `EGM.Api/`: Web API + React dashboard (no build step — vendored React UMD + Babel).
+* `EGM.Core.Tests/`: Unit tests using xUnit and Moq (40 tests).
+* `Logs/`: Stores logs, configuration, install history, and sample update packages.
 
 ## How to Run
 
-1.  **Open a terminal** in the solution root folder.
+### CLI (Console Application)
+
+1.  **Open a terminal** in the `EGM.Core` folder.
 2.  **Build the project**:
     ```bash
     dotnet build
@@ -27,6 +38,17 @@ This project is a logic-only C# console application that simulates the core cont
     ```
 4.  You will see the `EGM>` prompt indicating the CLI is ready.
 
+### Web Dashboard (API + React UI)
+
+1.  **Open a terminal** in the `EGM.Api` folder.
+2.  **Build and run**:
+    ```bash
+    dotnet run
+    ```
+3.  **Open your browser** to `http://localhost:5080`.
+
+The dashboard provides real-time status, interactive controls (start/stop game, door signal, device simulation), configuration management, package updates, and log browsing — all over the same core business logic used by the CLI.
+
 ---
 
 ## 5-Step Demonstration Sequence 
@@ -34,10 +56,11 @@ This project is a logic-only C# console application that simulates the core cont
 To verify the 5 required behaviors (Game Update, Door Open, Bill Validator, OS Settings, and State Machine), follow this exact command sequence.
 
 ### **Preparation**
-Before running the update commands, you must create dummy update package files because the system validates file existence.
-1.  Navigate to the `Logs` folder inside the project (e.g., `E:\EGM.Core\Logs`).
-2.  Create an empty text file named: `update_pkg_2.0.0.txt`
-3.  Create another empty text file named: `update_pkg_bad_3.0.0.txt`
+The sample update packages already ship in the `Logs` folder, so no manual setup is needed:
+- `update_pkg_2.0.0.txt` — a valid package (successful update).
+- `update_pkg_bad_3.0.0.txt` — a package whose name contains `bad`, which the system is programmed to reject (triggers rollback).
+
+If they are missing, just create two empty text files with those exact names inside `Logs`.
 
 ### **Step 1: State Machine & Logging (Behavior #5)**
 Test standard state transitions and verify logging output.
@@ -48,9 +71,9 @@ EGM> status
 Output:
  ---------------------------------
 State:              IDLE
-Current Version:    1.1.6
-Last Known Good:    1.1.5
-Timezone:           UTC
+Current Version:    1.1.8
+Last Known Good:    1.1.7
+Timezone:           India Standard Time
 NTP Enabled:        True
 ---------------------------------
 ```
@@ -101,8 +124,7 @@ Test a successful update and a failed update (triggering rollback).
 
 ### A. Successful Update
 ```
-EGM> update --package "..\..\..\Logs\update_pkg_2.0.0.txt"
-(Note: Adjust the path if your Logs folder is in a different location relative to the executable)
+EGM> update --package "Logs\update_pkg_2.0.0.txt"
 ```
 Output:
 ![alt text](Images/successfull_package_update.png)
@@ -110,20 +132,43 @@ Output:
 ### B. Failed Update (Rollback)
 The system is programmed to fail any package containing the word "bad" in the filename.
 
-Plaintext
-EGM> update --package "..\..\..\Logs\update_pkg_bad_3.0.0.txt"
+```
+EGM> update --package "Logs\update_pkg_bad_3.0.0.txt"
+```
 
 Output:
 
 ![alt text](Images/failed_update.png)
 
 ## Log Files
-### All events are persisted to disk. You can view them in the Logs directory:
-### Log Rotation is implemented to prevent excessive disk usage. Each log file is limited to 5MB, and a new file is created when the limit is reached.
-### system.log: General operational logs.
 
+All events are persisted to disk in the `Logs` directory. Log rotation is implemented to prevent excessive disk usage (each log file is limited to 5MB).
 
-### install_history.json: Record of updates and rollbacks.
+- **system.log**: General operational logs.
+- **install_history.json**: Record of updates and rollbacks.
+- **config.json**: Persisted state of the machine.
 
+---
 
-#### config.json: Persisted state of the machine.
+## Testing
+
+The project includes 40 unit tests covering core business logic:
+
+```bash
+cd EGM.Core.Tests
+dotnet test
+```
+
+For code coverage:
+
+```bash
+dotnet test --collect:"XPlat Code Coverage"
+```
+
+Coverage: **29.2%** overall; pure-logic classes (StateManager, PackageValidator, TimeZoneValidator, UpdateManager) at 92–100%.
+
+---
+
+## Architecture
+
+For design patterns, state machine diagrams, threading model, and two-front-ends-one-core rationale, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
