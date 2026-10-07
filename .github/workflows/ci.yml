@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    # Windows on purpose, not by accident. The product is a Windows-deployed kiosk
+    # simulator - the deployment story is an EGM box on a Z:\ drive - so CI should
+    # validate the platform it actually ships to. (The test suite is in fact portable
+    # now; see the note about drive letters in FileFunctionsTests.)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Both are needed: EGM.Core and EGM.Api target net8.0, the test project
+          # targets net9.0. Installing both runtimes means the test host does not
+          # rely on roll-forward the way a local SDK-10-only machine does.
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore
+        run: dotnet restore EGM.Core.sln
+
+      - name: Build
+        run: dotnet build EGM.Core.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test EGM.Core.Tests/EGM.Core.Tests.csproj --configuration Release --no-build --verbosity normal
