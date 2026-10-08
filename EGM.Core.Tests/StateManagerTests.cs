@@ -153,6 +153,24 @@ namespace EGM.Core.Tests
         }
 
         [Fact]
+        public void ForceState_WhenAlreadyInTargetState_ShouldNotFireEvent()
+        {
+            // ForceState used to notify unconditionally, so forcing MAINTENANCE while
+            // already in MAINTENANCE logged a misleading "MAINTENANCE -> MAINTENANCE"
+            // and woke every subscriber for a change that never happened. It now
+            // mirrors the no-op case TransitionTo has always had.
+            _stateManager.ForceState(EGMStateEnum.MAINTENANCE, "Door");
+
+            int fireCount = 0;
+            _stateManager.OnStateChanged += _ => fireCount++;
+
+            _stateManager.ForceState(EGMStateEnum.MAINTENANCE, "Door again");
+
+            Assert.Equal(0, fireCount);
+            Assert.Equal(EGMStateEnum.MAINTENANCE, _stateManager.CurrentState);
+        }
+
+        [Fact]
         public void ForceState_ShouldFireEventOnce()
         {
             var received = new List<EGMStateEnum>();

@@ -1,6 +1,6 @@
-﻿using EGM.Core.Interfaces;
+using EGM.Core.Entities;
+using EGM.Core.Interfaces;
 using EGM.Core.Enums;
-using System.Diagnostics.Eventing.Reader;
 
 namespace EGM.Core.Services
 {
@@ -21,12 +21,17 @@ namespace EGM.Core.Services
             _history = history;
         }
 
-        public void InstallPackage(string packagePath)
+        /// <summary>
+        /// Runs one update attempt: validate, install, and roll back on failure.
+        /// Every exit path returns an <see cref="UpdateOutcome"/> so callers can
+        /// report what actually happened instead of assuming the install succeeded.
+        /// </summary>
+        public UpdateOutcome InstallPackage(string packagePath)
         {
             if (string.IsNullOrWhiteSpace(packagePath))
             {
                 _logger.Log(LogTypeEnum.Warning, "[Update] Package path cannot be empty.");
-                return;
+                return UpdateOutcome.Rejected("Package path cannot be empty.");
             }
 
             _logger.Log(LogTypeEnum.Info, $"[Update] Starting installation for: {packagePath}");
@@ -34,19 +39,20 @@ namespace EGM.Core.Services
             // Ensure system is in IDLE before updating
             if (!_state.TransitionTo(EGMStateEnum.UPDATING, "User initiated update"))
             {
-                _logger.Log(LogTypeEnum.Warning, "[Update] System must be in IDLE state to install updates.");
-                return;
+                const string reason = "System must be in IDLE state to install updates.";
+                _logger.Log(LogTypeEnum.Warning, $"[Update] {reason}");
+                return UpdateOutcome.Rejected(reason);
             }
 
             var currentConfig = _config.GetConfig();
             Version previousVersion = currentConfig.CurrentVersion;
 
-            
+
             if (!_packageValidator.TryValidateAndExtractVersion( packagePath, previousVersion, out Version newVersion,  out string errorMessage))
             {
                 _logger.Log(LogTypeEnum.Error, $"[Update] Validation failed: {errorMessage}");
                 _state.TransitionTo(EGMStateEnum.IDLE, "Update validation failed");
-                return; 
+                return UpdateOutcome.Rejected(errorMessage);
             }
 
             try
@@ -68,6 +74,8 @@ namespace EGM.Core.Services
                 _logger.Log(LogTypeEnum.Info, $"[Update] Installation successful. Active version: {newVersion}");
 
                 _state.TransitionTo(EGMStateEnum.IDLE, "Update completed successfully");
+
+                return UpdateOutcome.Installed(previousVersion, newVersion);
             }
             catch (Exception ex)
             {
@@ -76,6 +84,8 @@ namespace EGM.Core.Services
                 PerformRollback(previousVersion);
 
                 _state.TransitionTo(EGMStateEnum.IDLE, "Rollback completed");
+
+                return UpdateOutcome.RolledBackFrom(previousVersion, newVersion, ex.Message);
             }
         }
 

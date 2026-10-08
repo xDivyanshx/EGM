@@ -20,13 +20,26 @@ namespace EGM.Core.Tests
         }
 
         [Fact]
-        public void LogDirectory_ShouldResolveToExistingLogsFolder()
+        public void LogDirectory_ShouldResolveToLogsFolder()
         {
             string dir = FileFunctions.LogDirectory;
 
             Assert.False(string.IsNullOrWhiteSpace(dir));
             Assert.EndsWith("Logs", dir);
-            Assert.True(Directory.Exists(dir)); // getter creates it if missing
+            // No Directory.Exists assertion here on purpose. This property is now
+            // side-effect free, so whether the folder happens to exist is not part of
+            // its contract - EnsureLogDirectory_ShouldCreateTheFolder covers creation.
+        }
+
+        [Fact]
+        public void EnsureLogDirectory_ShouldCreateTheFolder()
+        {
+            string dir = FileFunctions.EnsureLogDirectory();
+
+            Assert.EndsWith("Logs", dir);
+            Assert.True(Directory.Exists(dir));
+            // Same location as the pure property - the two must never diverge.
+            Assert.Equal(FileFunctions.LogDirectory, dir);
         }
 
         [Fact]
@@ -57,10 +70,15 @@ namespace EGM.Core.Tests
         }
 
         [Fact]
-        public void TryWriteFile_InvalidPath_ReturnsFalseWithError()
+        public void TryWriteFile_UnwritablePath_ReturnsFalseWithError()
         {
-            // A path with an invalid directory triggers the catch branch.
-            string bad = Path.Combine("Z:\\no_such_drive_egm", "sub", "file.txt");
+            // A path whose parent directory does not exist, which is what makes the
+            // write throw. Deliberately NOT a "Z:\..." drive letter: on Linux that is a
+            // perfectly legal file name, so the write would succeed and leave a junk
+            // file in the working directory - and poison TryReadFile_MissingDirectory_
+            // ReturnsFalse below, which reads the same path. This form fails identically
+            // on every platform.
+            string bad = Path.Combine(Path.GetTempPath(), $"egm_absent_{Guid.NewGuid():N}", "sub", "file.txt");
 
             bool wrote = FileFunctions.TryWriteFile(bad, "x", out string error);
 
@@ -69,18 +87,17 @@ namespace EGM.Core.Tests
         }
 
         [Fact]
-        public void TryReadFile_InvalidPathCharacters_ReturnsFalseWithError()
+        public void TryReadFile_MissingDirectory_ReturnsFalse()
         {
-            // Force the exception branch (not the "does not exist" branch) with an
-            // illegal path so File.Exists throws / returns false via a bad drive.
-            string bad = "Z:\\no_such_drive_egm\\sub\\file.txt";
+            // File.Exists returns false (rather than throwing) for a path under a
+            // directory that isn't there, so this exercises the "does not exist" branch.
+            string bad = Path.Combine(Path.GetTempPath(), $"egm_absent_{Guid.NewGuid():N}", "sub", "file.txt");
 
             bool read = FileFunctions.TryReadFile(bad, out string content, out string error);
 
-            // Non-existent drive => File.Exists is false => "File does not exist."
             Assert.False(read);
             Assert.Empty(content);
-            Assert.False(string.IsNullOrEmpty(error));
+            Assert.Equal("File does not exist.", error);
         }
     }
 }

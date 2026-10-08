@@ -14,7 +14,8 @@ namespace EGM.Core.Services
         private const long _maxLogSizeBytes = 5 * 1024 * 1024;
         public LoggerService()
         {
-            string dataDir = FileFunctions.LogDirectory;
+            // EnsureLogDirectory, not LogDirectory: the constructor is about to write.
+            string dataDir = FileFunctions.EnsureLogDirectory();
             _logFilePath = Path.Combine(dataDir, "system.log");
             _errorLogFilePath = Path.Combine(dataDir, "system.err");
         }

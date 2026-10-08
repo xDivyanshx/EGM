@@ -111,6 +111,11 @@ select, input[type=text] {
 
 .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
+/* Outcome line under the update card - the result of the last install attempt. */
+.result { font-size: 13px; margin-top: 10px; line-height: 1.4; }
+.result.ok { color: var(--green); }
+.result.warn { color: var(--amber); }
+
 /* Toggle pill */
 .pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
 .pill-ok { background: #14361f; color: var(--green); }

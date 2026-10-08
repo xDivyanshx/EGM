@@ -41,7 +41,12 @@ namespace EGM.Core.Tests
             string emptyErr;
             _mockValidator.Setup(v => v.TryValidateAndExtractVersion(It.IsAny<string>(), currentVer,out expectedOutVer,out emptyErr)).Returns(true);
 
-            _updateManager.InstallPackage("valid_pkg_2.0.0.txt");
+            var outcome = _updateManager.InstallPackage("valid_pkg_2.0.0.txt");
+
+            Assert.Equal(UpdateStatus.Installed, outcome.Status);
+            Assert.True(outcome.Succeeded);
+            Assert.Equal(currentVer, outcome.PreviousVersion);
+            Assert.Equal(newVer, outcome.InstalledVersion);
 
             _mockConfig.Verify(c => c.UpdateConfig(It.IsAny<Action<SystemConfig>>()), Times.Once);
             _mockHistory.Verify(h => h.RecordInstall(currentVer, newVer), Times.Once);
@@ -59,7 +64,14 @@ namespace EGM.Core.Tests
             string err;
             _mockValidator.Setup(v => v.TryValidateAndExtractVersion(It.IsAny<string>(), currentVer, out expectedOutVer,out err)).Returns(true);
 
-            _updateManager.InstallPackage("update_pkg_bad_2.0.0.txt");
+            var outcome = _updateManager.InstallPackage("update_pkg_bad_2.0.0.txt");
+
+            // The whole point of the outcome type: a rollback must not look like a success.
+            Assert.Equal(UpdateStatus.RolledBack, outcome.Status);
+            Assert.False(outcome.Succeeded);
+            Assert.Null(outcome.InstalledVersion);
+            Assert.Equal(currentVer, outcome.PreviousVersion);
+
             _mockHistory.Verify(h => h.RecordRollback(currentVer), Times.Once);
             _mockConfig.Verify(c => c.UpdateConfig(It.IsAny<Action<SystemConfig>>()), Times.Once);
             _mockState.Verify(s => s.TransitionTo(EGMStateEnum.IDLE, "Rollback completed"), Times.Once);
@@ -71,7 +83,9 @@ namespace EGM.Core.Tests
         [InlineData(null)]
         public void InstallPackage_EmptyPath_ShouldNoOp(string? path)
         {
-            _updateManager.InstallPackage(path!);
+            var outcome = _updateManager.InstallPackage(path!);
+
+            Assert.Equal(UpdateStatus.Rejected, outcome.Status);
 
             // Never even attempts to enter UPDATING.
             _mockState.Verify(s => s.TransitionTo(It.IsAny<EGMStateEnum>(), It.IsAny<string>()), Times.Never);
@@ -84,7 +98,9 @@ namespace EGM.Core.Tests
             // System refuses to enter UPDATING (e.g. it is RUNNING or in MAINTENANCE).
             _mockState.Setup(s => s.TransitionTo(EGMStateEnum.UPDATING, It.IsAny<string>())).Returns(false);
 
-            _updateManager.InstallPackage("update_pkg_2.0.0.txt");
+            var outcome = _updateManager.InstallPackage("update_pkg_2.0.0.txt");
+
+            Assert.Equal(UpdateStatus.Rejected, outcome.Status);
 
             var dummy = new Version(0, 0);
             string dummyErr;
@@ -104,7 +120,10 @@ namespace EGM.Core.Tests
             string err = "Downgrade or same version not allowed.";
             _mockValidator.Setup(v => v.TryValidateAndExtractVersion(It.IsAny<string>(), currentVer, out outVer, out err)).Returns(false);
 
-            _updateManager.InstallPackage("update_pkg_0.5.0.txt");
+            var outcome = _updateManager.InstallPackage("update_pkg_0.5.0.txt");
+
+            Assert.Equal(UpdateStatus.Rejected, outcome.Status);
+            Assert.Equal(err, outcome.Message);
 
             _mockState.Verify(s => s.TransitionTo(EGMStateEnum.IDLE, "Update validation failed"), Times.Once);
             _mockConfig.Verify(c => c.UpdateConfig(It.IsAny<Action<SystemConfig>>()), Times.Never);

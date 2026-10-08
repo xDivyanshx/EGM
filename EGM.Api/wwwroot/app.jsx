@@ -124,6 +124,7 @@ function TimezoneCard({ status, onAction, refresh }) {
 function UpdateCard({ onAction, refresh }) {
     const [packages, setPackages] = useState([]);
     const [pkg, setPkg] = useState("");
+    const [result, setResult] = useState(null);
 
     const loadPackages = useCallback(() => {
         api.get("/api/packages").then((list) => {
@@ -135,9 +136,16 @@ function UpdateCard({ onAction, refresh }) {
     useEffect(() => { loadPackages(); }, []);
 
     const install = async () => {
-        await onAction("/api/update", { packagePath: pkg });
-        // Give the pre-install hook (1s simulated) time, then refresh status + history.
-        setTimeout(refresh, 1400);
+        setResult(null);
+        const res = await onAction("/api/update", { packagePath: pkg });
+        // The POST blocks until the install is finished - validation, the simulated
+        // pre-install hook, and any rollback - so the response already carries the
+        // outcome. This used to wait a guessed 1400ms and then re-read the log.
+        const outcome = res?.data ?? {};
+        setResult({
+            cls: outcome.success ? "ok" : "warn",
+            msg: outcome.message ?? (outcome.error || "No response from server."),
+        });
     };
 
     return (
@@ -157,6 +165,7 @@ function UpdateCard({ onAction, refresh }) {
                 Validates (exists, format, newer version), runs a pre-install hook, then commits —
                 or rolls back automatically if the filename contains "bad". Machine must be IDLE.
             </p>
+            {result && <p className={"result " + result.cls}>{result.msg}</p>}
         </div>
     );
 }
@@ -285,7 +294,7 @@ function App() {
                 <ControlsCard onAction={onAction} />
                 <BillValidatorCard onAction={onAction} />
                 <TimezoneCard status={status} onAction={onAction} refresh={refresh} />
-                <UpdateCard onAction={onAction} refresh={refresh} />
+                <UpdateCard onAction={onAction} />
                 <HistoryCard history={history} />
                 <LogPanel logs={logs} />
             </div>

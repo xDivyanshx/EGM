@@ -62,6 +62,15 @@ namespace EGM.Core.Services
         {
             lock (_lock)
             {
+                // Mirror TransitionTo's no-op case. Without this, forcing the state the
+                // machine is already in logged a misleading "MAINTENANCE -> MAINTENANCE"
+                // and woke every subscriber for a change that never happened.
+                if (_currentState == newState)
+                {
+                    _logger.Log(LogTypeEnum.Warning, $"[FORCE] Ignored: already in {newState}.");
+                    return;
+                }
+
                 _logger.Log(LogTypeEnum.Warning, $"[FORCE] Forcing state to {newState}. Reason: {reason}");
                 PerformTransition(newState, reason);
             }

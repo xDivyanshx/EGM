@@ -120,7 +120,9 @@ namespace EGM.Core.Services
         private void HandleUpdate(string[] parts)
         {
             // Expected:
-            // update --package "E:\EGM.Core\Data\update_pkg_1.1.6.txt"
+            // update --package "Logs/update_pkg_2.0.0.txt"
+            // The path is resolved relative to the working directory, so it works with
+            // either separator. Quoting is required if the path contains spaces.
 
             if (parts.Length >= 3 && parts[1].Equals("--package", StringComparison.OrdinalIgnoreCase))
             {
@@ -128,7 +130,12 @@ namespace EGM.Core.Services
                 // (e.g. C:\Program Files\pkg.txt) survive the Split(' ') above.
                 // parts[2] alone would keep only the first token before the space.
                 var packagePath = string.Join(" ", parts.Skip(2)).Trim('"');
-                _updateManager.InstallPackage(packagePath);
+                var outcome = _updateManager.InstallPackage(packagePath);
+
+                // InstallPackage logs the detail and records history itself; this is the
+                // operator-facing one-liner. It distinguishes a rollback from a success,
+                // which the old void return made impossible to see on the console.
+                Console.WriteLine(outcome.Message);
             }
             else
             {

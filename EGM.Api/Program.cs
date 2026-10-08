@@ -41,7 +41,10 @@ services.AddSingleton<ITimeZoneValidator, TimeZoneValidator>();
 services.AddSingleton<IUpdateManager, UpdateManager>();
 // NOTE: ICliProcessor is intentionally not registered here (see EGM.Core/Services/CliProcessor.cs).
 
-services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+// No CORS policy on purpose. The dashboard is served from wwwroot on this same
+// origin and every fetch in app.jsx uses a relative /api/... URL, so no
+// cross-origin request is ever made. The previous AllowAnyOrigin policy bought
+// nothing and let any web page the operator happened to visit drive this API.
 
 var app = builder.Build();
 
@@ -51,7 +54,6 @@ var app = builder.Build();
 var billValidator = app.Services.GetRequiredService<IBillValidator>();
 billValidator.Start();
 
-app.UseCors();
 app.UseDefaultFiles();   // serve wwwroot/index.html at "/"
 
 // Teach the static-file middleware about .jsx (unknown by default => would 404).
@@ -151,10 +153,21 @@ app.MapPost("/api/update", (UpdateRequest req, IUpdateManager update) =>
     if (!Path.IsPathRooted(path))
         path = Path.Combine(EGM.Core.Infrastructure.FileFunctions.LogDirectory, path);
 
-    update.InstallPackage(path);
-    // InstallPackage is void and self-logging; the UI reads the outcome from /api/logs
-    // and the refreshed /api/status. We just acknowledge receipt here.
-    return Results.Ok(new { success = true, resolvedPath = path });
+    // InstallPackage blocks through validation, the pre-install hook and any rollback,
+    // so by the time it returns the outcome is final. Previously it returned void and
+    // this endpoint answered success = true unconditionally - including after a
+    // rollback. The UI no longer has to infer the result from the log.
+    var outcome = update.InstallPackage(path);
+
+    return Results.Ok(new
+    {
+        success = outcome.Succeeded,
+        status = outcome.Status.ToString(),
+        message = outcome.Message,
+        resolvedPath = path,
+        previousVersion = outcome.PreviousVersion?.ToString(),
+        installedVersion = outcome.InstalledVersion?.ToString()
+    });
 });
 
 // --- Install history (reads install_history.json) -------------------------
@@ -175,7 +188,12 @@ app.MapGet("/api/history", (IInstallHistoryStore history) =>
 // List the sample package files available in the Logs folder, for convenience.
 app.MapGet("/api/packages", () =>
 {
+    // LogDirectory is now side-effect free, so a cold start on a machine where the
+    // Logs folder has not been created yet returns an empty list instead of throwing.
     var dir = EGM.Core.Infrastructure.FileFunctions.LogDirectory;
+    if (!Directory.Exists(dir))
+        return Results.Ok(Array.Empty<string>());
+
     var files = Directory.GetFiles(dir, "*.txt")
         .Select(Path.GetFileName)
         .Where(n => n!.Contains("pkg", StringComparison.OrdinalIgnoreCase))

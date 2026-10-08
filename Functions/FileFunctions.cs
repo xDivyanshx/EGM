@@ -2,17 +2,26 @@
 {
     public static class FileFunctions
     {
-        public static string LogDirectory
+        /// <summary>
+        /// The Logs directory path. Reading this property has no side effects - it
+        /// creates nothing. Callers about to write should use
+        /// <see cref="EnsureLogDirectory"/> instead.
+        /// </summary>
+        public static string LogDirectory => Path.Combine(FindProjectRoot(), "Logs");
+
+        /// <summary>
+        /// Returns <see cref="LogDirectory"/>, creating it first if it does not exist.
+        ///
+        /// Deliberately separate from the property. The property used to call
+        /// Directory.CreateDirectory, so merely reading a path - from a status
+        /// endpoint, a test, or a log line - wrote to disk. Creating the directory is
+        /// now something only writers do, and it is visible at the call site.
+        /// </summary>
+        public static string EnsureLogDirectory()
         {
-            get
-            {
-                string projectRoot = FindProjectRoot();
-                string dataPath = Path.Combine(projectRoot, "Logs");
-
-                Directory.CreateDirectory(dataPath);
-
-                return dataPath;
-            }
+            string path = LogDirectory;
+            Directory.CreateDirectory(path);
+            return path;
         }
 
         /// <summary>
